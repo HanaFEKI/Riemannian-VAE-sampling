@@ -1,0 +1,409 @@
+\documentclass[aspectratio=169, 10pt]{beamer} 
+
+% --- PACKAGES ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usepackage{caption} 
+\usepackage{mathtools}
+
+% --- THEME & COLORS ---
+\usetheme{Madrid}
+\definecolor{burgundy}{RGB}{128, 0, 32} 
+\usecolortheme[named=burgundy]{structure}
+\setbeamercolor{palette primary}{bg=burgundy, fg=white}
+\setbeamercolor{frametitle}{bg=burgundy, fg=white}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+
+% --- CUSTOM COMMANDS ---
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Z}{\mathcal{Z}}
+\newcommand{\X}{\mathcal{X}}
+
+% --- METADATA ---
+\title[Latent Space Oddity]{Latent Space Oddity: \\ Riemannian Geometry in VAEs}
+\subtitle{Unifying Interpolation and Sampling via Geometry}
+\author[H. Feki, M. Lambert]{Hana FEKI \and Mayeul LAMBERT}
+\institute[ENS Paris-Saclay]{Course Instructor: S. ALLASSONNIERE \\ Computational Statistics -- ENS Paris-Saclay}
+\date{\today}
+
+\begin{document}
+
+% ================================================
+% SLIDE 1: TITLE
+% ================================================
+\begin{frame}
+  \begin{tikzpicture}[remember picture, overlay]
+    \node[anchor=north west, xshift=0.5cm, yshift=-0.05cm] at (current page.north west) {
+      \includegraphics[height=1cm]{ens_logo.png} 
+    };
+    \node[anchor=north east, xshift=-0.5cm, yshift=0cm] at (current page.north east) {
+      \includegraphics[height=1.5cm]{logo_mva.jpg} 
+    };
+  \end{tikzpicture}
+  \maketitle
+\end{frame}
+
+% ================================================
+% SLIDE 2: PROBLEM HOOK
+% ================================================
+\begin{frame}{The "Flat Earth" Assumption of VAEs}
+  
+  \textbf{How Standard VAEs View Latent Space:}
+  \begin{itemize}
+      \item The latent space $\Z = \R^d$ is treated as a \textbf{flat Euclidean space}.
+      \item Distances are measured via the standard $L_2$ norm: 
+      $$ d(z_1, z_2) = \|z_1 - z_2\|_2 $$
+      \item \textbf{Interpolation Strategy:} Linear paths are assumed to be optimal.
+      $$ z(t) = (1-t)z_0 + t z_1 $$
+  \end{itemize}
+
+
+\end{frame}
+
+\begin{frame}{The Reality: Latent Space is Curved}
+  
+  \begin{columns}
+    \column{0.45\textwidth}
+      \textbf{The Reality Gap:}
+      \begin{itemize}
+          \item The decoder $f_\theta: \Z \to \X$ is a non-linear mapping (neural network).
+          \item It defines a curved \textbf{manifold} embedded in the data space.
+          \item \alert{Consequence:} A straight line in $\Z$ bends and twists when mapped to $\X$.
+      \end{itemize}
+    \column{0.55\textwidth}
+      \centering
+      % Use the new curvature figure you generated
+      \includegraphics[width=\linewidth]{figure_curvature_demo.png}
+      \captionof{figure}{\textbf{Left:} Linear path in Latent Space (Blue line).
+    \textbf{Right:} The actual curved path taken in Data Space (PCA projection).}
+  \end{columns}
+\end{frame}
+% ================================================
+% SLIDE 3: VAE FOUNDATIONS (THE SETTING)
+% ================================================
+\begin{frame}{VAE: The Probabilistic Framework}
+  \textit{Before fixing the geometry, let's recall the architecture.}
+  
+  \vspace{0.3cm}
+
+  \begin{columns}[t]
+    % ENCODER
+    \column{0.48\textwidth}
+      \textbf{\textcolor{burgundy}{1. Encoder (Inference)}}
+      \begin{itemize}
+        \item Maps input $x$ to latent posterior approx.
+        \item $q_\phi(z|x) = \mathcal{N}(z \,|\, \mu_\phi(x), \, \text{diag}(\sigma^2_\phi(x)))$
+        \item \emph{Role:} Compresses data into codes.
+      \end{itemize}
+
+    % DECODER
+    \column{0.48\textwidth}
+      \textbf{\textcolor{burgundy}{2. Decoder (Generator)}}
+      \begin{itemize}
+        \item Maps latent $z$ back to data space.
+        \item $p_\theta(x|z) = \mathcal{N}(x \,|\, \mu_\theta(z), \, \Sigma_\theta(z))$
+        \item \emph{Role:} Defines the data manifold.
+      \end{itemize}
+  \end{columns}
+
+  \vspace{0.6cm}
+  
+  \textbf{Optimization Objective (ELBO):}
+  \begin{equation*}
+    \mathcal{L}_{\text{VAE}} = \underbrace{-\mathbb{E}_{q_\phi}[\log p_\theta(x|z)]}_{\text{Reconstruction (MSE)}} + \beta \cdot \underbrace{D_{KL}(q_\phi(z|x) \| \mathcal{N}(0, I))}_{\text{Regularization (Euclidean)}}
+  \end{equation*}
+\end{frame}
+
+
+% ================================================
+% SLIDE 4: Riemannian Metric
+% ================================================
+\begin{frame}{Riemannian Metric}
+
+The decoder $f_\theta: \Z \to \X$ immerses the latent space into the data space. We can "pull back" the geometry of the data space into $\Z$.
+
+  \vspace{0.5cm}
+
+  \begin{block}{The Pull-back Metric Tensor}
+    For a generator $f_\theta(z)$, the Riemannian metric $M_z \in \R^{d \times d}$ is given by:
+    $$ M_z = \mathbf{J}_f(z)^\top \mathbf{J}_f(z) $$
+    where $\mathbf{J}_f(z) = \frac{\partial f}{\partial z}$ is the Jacobian matrix of the decoder.
+  \end{block}
+
+  \vspace{0.4cm}
+  \textbf{Physical Meaning:}
+  It measures \textbf{local sensitivity}. A small step $dz$ in latent space results in a change in data space of squared length:
+  $$ ds^2 = dz^\top M_z \, dz $$
+\end{frame}
+
+% ================================================
+% SLIDE 4b: VISUAL INTERPRETATION
+% ================================================
+\begin{frame}{Interpreting the Metric Landscape}
+  \begin{columns}
+    \column{0.55\textwidth}
+      \begin{itemize}
+          \item \textbf{High Curvature} ($\det M_z$ large):
+          \begin{itemize}
+              \item A small change in $z$ causes a \emph{large} change in the image $x$.
+              \item Corresponds to \textbf{data-rich regions} (the manifold).
+          \end{itemize}
+          
+          \vspace{0.3cm}
+          \item \textbf{Low Curvature} ($\det M_z \approx 0$):
+          \begin{itemize}
+              \item Changing $z$ barely affects the output image.
+              \item Corresponds to \textbf{empty space} or "dead zones."
+          \end{itemize}
+      \end{itemize}
+
+    \column{0.45\textwidth}
+      \centering
+      
+      \includegraphics[width=0.9\linewidth]{figure_variance_analysis.png}
+      \captionof{figure}{High curvature regions = data-rich. Light regions = empty space.}
+  \end{columns}
+\end{frame}
+
+
+% ================================================
+% SLIDE 5: RBF VARIANCE
+% ================================================
+\begin{frame}{RBF Variance Network}
+  \textbf{Motivation:} 
+\begin{itemize}
+          \item Standard Neural Networks extrapolate linearly in empty space.
+          \item \alert{Risk:} The metric $M_z$ might remain small in "dead zones," allowing geodesics to cross them.
+      \end{itemize}
+
+      \vspace{0.3cm}
+      \textbf{Solution:} 
+      We parameterize the precision $\beta(z)$ as a mixture of radial basis functions, similar to a \textbf{Gaussian Mixture Model (GMM)} fixed on the training data.
+
+      $$ \beta(z) = \Sigma_\theta(z)^{-1} = \sum_{k=1}^K w_k \exp\left( -\frac{\|z - c_k\|^2}{2\lambda^2} \right) $$
+
+     \textbf{Geometric Effect:}
+      \begin{itemize}
+          \item \textbf{Near Data ($c_k$):} Variance is low $\to$ Metric is normal.
+          \item \textbf{Far from Data:} Variance explodes ($\beta \to 0$) $\to$ Metric explodes.
+          
+      \end{itemize}
+  
+\end{frame}
+
+\begin{frame}{RBF Coverage Example}
+  \centering
+  \includegraphics[width=0.4\linewidth]{figure_rbf_centers.png}
+  \captionof{figure}{RBF centers (red X) and coverage circles. Sparse zones get larger variance, forcing trajectories to stay near data.}
+\end{frame}
+
+% ================================================
+% SLIDE 6: GEODESIC INTERPOLATION
+% ================================================
+\begin{frame}{Geodesic Interpolation}
+  \textbf{Definition:}  A geodesic $\gamma(t)$ minimizes the energy functional:
+  $$ \mathcal{E}(\gamma) = \int_0^1 \sqrt{ \dot{\gamma}(t)^\top M_{\gamma(t)} \dot{\gamma}(t) } \, dt $$
+  \begin{itemize}
+      \item Linear paths fail in curved latent spaces.
+      \item Geodesics respect latent geometry.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Geodesic vs Linear Interpolation}
+  \centering
+  \includegraphics[width=0.7\linewidth]{figure_interpolation.png}
+  \captionof{figure}{First Line = Euclidean (linear). Second = Geodesic interpolation. Geodesics stay on high-density manifold.}
+\end{frame}
+
+% ================================================
+% SLIDE 7: GEOMETRY-AWARE MCMC
+% ================================================
+
+
+
+\begin{frame}{Beyond Interpolation: Geometry-Aware Sampling}
+  \textit{Interpolation fixes paths; geometry-aware sampling captures uncertainty.}
+
+  \textbf{Bayesian Goal:}
+  \begin{itemize}
+      \item Sample from the posterior $p(z|x)$ in latent space.
+      \item Capture multimodality and uncertainty beyond Gaussian approximations.
+  \end{itemize}
+
+  \vspace{0.3cm}
+  \textbf{Limitation of Standard MCMC:}
+  \begin{itemize}
+      \item Random-walk Metropolis–Hastings uses isotropic proposals.
+      \item In curved or anisotropic latent spaces:
+      \begin{itemize}
+          \item High rejection rate
+          \item Poor exploration of the manifold
+      \end{itemize}
+  \end{itemize}
+
+  \vspace{0.3cm}
+  \alert{Idea:} Adapt proposals using the \textbf{local latent geometry and RBF variance network}.
+\end{frame}
+
+
+\begin{frame}{Geometry-Aware Metropolis–Hastings}
+  \textbf{Key Idea:} Replace isotropic Gaussian proposals with geometry-aware ones.
+
+  \begin{block}{Metric- and RBF-Informed Proposal}
+    At latent position $z$, propose:
+    $$
+    z' = z + \epsilon \, \mathcal{N}(0, \, \sigma(z)^2)
+    $$
+    where $\sigma(z)$ is computed from:
+    \begin{itemize}
+        \item Local Riemannian metric $M_z$
+        \item RBF variance network trained on latent codes
+    \end{itemize}
+  \end{block}
+
+  \textbf{Interpretation:}
+  \begin{itemize}
+      \item High curvature regions $\Rightarrow$ smaller steps
+      \item Sparse / flat regions $\Rightarrow$ larger steps
+      \item Proposals stay near the data manifold
+  \end{itemize}
+
+  \vspace{0.2cm}
+  \textbf{Acceptance Rule:}
+  \begin{equation*}
+    \alpha = \min\left(1, 
+    \frac{p(z'|x) \, q(z|z')}
+         {p(z|x) \, q(z'|z)} \right)
+  \end{equation*}
+\end{frame}
+
+
+\begin{frame}{Adaptive MCMC via Robbins--Monro}
+  \textbf{Problem:} Choosing $\epsilon$ for efficient exploration.
+
+  \textbf{Solution: Adaptive MCMC}
+  \begin{itemize}
+      \item Target an optimal acceptance rate (e.g., 23\%)
+      \item Update $\epsilon$ online using stochastic approximation
+  \end{itemize}
+
+  \begin{block}{Robbins--Monro Update}
+    $$
+    \epsilon_{t+1} = \epsilon_t +
+    \eta_t \left( \alpha_t - \alpha^\star \right)
+    $$
+    where:
+    \begin{itemize}
+        \item $\alpha_t$ = observed acceptance rate
+        \item $\alpha^\star$ = target acceptance rate
+        \item $\eta_t = 1/\sqrt{t}$ = decreasing step size
+    \end{itemize}
+  \end{block}
+
+  \textbf{Outcome:}
+  \begin{itemize}
+      \item Automatic adaptation to local geometry
+      \item Improved mixing along the latent manifold
+      \item Stabilizes acceptance near $\alpha^\star$ without manual tuning
+  \end{itemize}
+\end{frame}
+
+
+\begin{frame}{Adaptive Gibbs Sampling in Latent Space}
+  \textbf{Comparison of Strategies:}
+  \begin{itemize}
+      \item Vanilla Gibbs: isotropic proposals → poor mixing
+      \item Adaptive Gibbs: automatic scale adaptation → better acceptance
+      \item Adaptive + RBF: geometry-aware proposals → stays on manifold
+  \end{itemize}
+
+  \vspace{0.3cm}
+  \textbf{Diagnostics and Metrics:}
+  \begin{itemize}
+      \item Acceptance rates ≈ 23\%
+      \item Faster autocorrelation decay
+      \item Trajectories concentrated on high-density manifold
+  \end{itemize}
+\end{frame}
+
+
+% ================================================
+% SLIDE 8: EXPERIMENTAL RESULTS
+% ================================================
+\begin{frame}{Experimental Results: Trajectory}
+  \centering
+  \includegraphics[width=0.45\linewidth]{figure_mcmc_trajectory.png}
+  \captionof{figure}{Adaptive MCMC trajectory starting from a latent point. Paths follow the high-density manifold.}
+\end{frame}
+
+\begin{frame}{Experimental Results: Acceptance \& Decorrelation}
+  \begin{columns}
+    \column{0.48\textwidth}
+      \centering
+      \includegraphics[width=\linewidth]{figure_mcmc_acceptance.png}
+      \captionof{figure}{Acceptance rate adapts to target 23\% over iterations.}
+    \column{0.48\textwidth}
+      \centering
+      \includegraphics[width=\linewidth]{figure_mcmc_autocorr.png}
+      \captionof{figure}{Autocorrelation decays faster using adaptive geometry-aware proposals.}
+  \end{columns}
+\end{frame}
+
+
+
+
+\begin{frame}{Conclusion}
+  \textbf{Take-Home Messages:}
+  \begin{enumerate}
+      \item Euclidean operations in latent space ignore local curvature.
+      \item Decoder defines a \emph{Riemannian metric} capturing local density.
+      \item Geometry-aware methods improve:
+      \begin{itemize}
+          \item Interpolation via geodesics
+          \item Sampling via adaptive, geometry-informed MCMC
+      \end{itemize}
+  \end{enumerate}
+
+  \vspace{0.3cm}
+  \begin{block}{From Geometry to Algorithms}
+    $$
+    \underbrace{f_\theta(z)}_{\text{Decoder}}
+    \;\longrightarrow\;
+    \underbrace{M_z \text{ / RBF variance}}_{\text{Latent Geometry}}
+    \;\longrightarrow\;
+    \begin{cases}
+      \text{Geodesics} & \text{Shortest paths} \\
+      \text{Adaptive MCMC} & \text{Efficient sampling}
+    \end{cases}
+    $$
+  \end{block}
+
+  \vspace{0.3cm}
+  \textbf{Methodological Contributions:}
+  \begin{itemize}
+      \item Metric estimation via decoder Jacobian
+      \item Variance regularization via RBF network
+      \item Adaptive step sizes with stochastic approximation
+  \end{itemize}
+
+\end{frame}
+% ================================================
+% SLIDE 10: REFERENCES
+% ================================================
+\begin{frame}{References}
+  \footnotesize
+  \begin{itemize}
+      \item Arvanitidis et al., \textit{Latent Space Oddity: on the Curvature of Deep Generative Models}, ICML 2018.
+      \item Kingma & Welling, \textit{Auto-Encoding Variational Bayes}, ICLR 2014.
+      \item Rezende et al., \textit{Stochastic Backpropagation and Approximate Inference in Deep Generative Models}, ICML 2014.
+
+  \end{itemize}
+\end{frame}
+
+\end{document}
